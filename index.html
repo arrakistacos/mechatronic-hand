@@ -1,1188 +1,651 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MECHATRONIC HAND v1.0</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PHANTOM HAND</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  body {
-    background: #000;
-    overflow: hidden;
-    font-family: 'Courier New', monospace;
-    color: #00ffff;
-  }
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+    }
 
-  #canvas-container {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-  }
+    /* Scanline overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.08) 2px,
+        rgba(0, 0, 0, 0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
 
-  #renderer-canvas {
-    display: block;
-    width: 100% !important;
-    height: 100% !important;
-  }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+    }
 
-  /* Scanline overlay */
-  #scanlines {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 0, 0, 0.08) 2px,
-      rgba(0, 0, 0, 0.08) 4px
-    );
-    z-index: 10;
-  }
+    #three-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
 
-  /* Title */
-  #title {
-    position: fixed;
-    top: 20px; left: 20px;
-    z-index: 20;
-    font-size: 18px;
-    font-weight: bold;
-    letter-spacing: 3px;
-    color: #00ffff;
-    text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
-    text-transform: uppercase;
-  }
+    /* HUD */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
 
-  #subtitle {
-    font-size: 10px;
-    letter-spacing: 4px;
-    color: #0088aa;
-    margin-top: 3px;
-  }
+    #title-block {
+      position: absolute;
+      top: 20px;
+      left: 24px;
+    }
 
-  /* Status panel */
-  #status-panel {
-    position: fixed;
-    top: 20px; right: 20px;
-    z-index: 20;
-    text-align: right;
-  }
+    #title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 6px;
+      color: #00ffff;
+      text-shadow: 0 0 12px #00ffff, 0 0 30px rgba(0,255,255,0.4);
+    }
 
-  .status-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-bottom: 6px;
-    font-size: 11px;
-    letter-spacing: 2px;
-  }
+    #subtitle {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: rgba(0,255,255,0.45);
+      margin-top: 4px;
+      text-transform: uppercase;
+    }
 
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: #333;
-    box-shadow: none;
-    transition: all 0.3s;
-  }
+    #status-block {
+      position: absolute;
+      top: 74px;
+      left: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-  .status-dot.active {
-    background: #00ff88;
-    box-shadow: 0 0 6px #00ff88;
-    animation: pulse 1.5s infinite;
-  }
+    #status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #ff2244;
+      box-shadow: 0 0 8px #ff2244;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
 
-  .status-dot.error {
-    background: #ff3333;
-    box-shadow: 0 0 6px #ff3333;
-  }
+    #status-dot.active {
+      background: #00ff88;
+      box-shadow: 0 0 10px #00ff88, 0 0 20px rgba(0,255,136,0.4);
+    }
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
+    #status-text {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+    }
 
-  /* Finger data HUD */
-  #finger-hud {
-    position: fixed;
-    bottom: 180px; right: 20px;
-    z-index: 20;
-    font-size: 10px;
-    letter-spacing: 1px;
-  }
+    #stats-block {
+      position: absolute;
+      bottom: 20px;
+      right: 24px;
+      text-align: right;
+    }
 
-  #finger-hud .hud-title {
-    font-size: 9px;
-    letter-spacing: 3px;
-    color: #0088aa;
-    margin-bottom: 8px;
-    text-align: right;
-  }
+    .stat-line {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: rgba(0,255,255,0.4);
+      line-height: 1.8;
+      text-transform: uppercase;
+    }
 
-  .finger-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-bottom: 5px;
-  }
+    .stat-val {
+      color: rgba(0,255,255,0.75);
+    }
 
-  .finger-label {
-    font-size: 9px;
-    color: #0088aa;
-    width: 50px;
-    text-align: right;
-  }
+    /* Camera preview */
+    #camera-preview {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      width: 200px;
+      height: 150px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(0,255,255,0.25);
+      box-shadow: 0 0 16px rgba(0,255,255,0.15), inset 0 0 8px rgba(0,0,0,0.6);
+      z-index: 20;
+    }
 
-  .finger-bar-bg {
-    width: 80px;
-    height: 6px;
-    background: #001a1a;
-    border: 1px solid #003333;
-  }
+    #webcam {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+      opacity: 0.85;
+    }
 
-  .finger-bar {
-    height: 100%;
-    background: linear-gradient(90deg, #00aaff, #00ffff);
-    box-shadow: 0 0 4px #00ffff;
-    transition: width 0.1s;
-    width: 0%;
-  }
+    #landmark-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      transform: scaleX(-1);
+    }
 
-  .finger-pct {
-    font-size: 9px;
-    width: 28px;
-    text-align: right;
-    color: #00ffff;
-  }
+    #cam-label {
+      position: absolute;
+      bottom: 7px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 8px;
+      letter-spacing: 1.5px;
+      color: rgba(255,255,255,0.55);
+      text-transform: uppercase;
+      background: rgba(0,0,0,0.4);
+      padding: 3px 0;
+      z-index: 2;
+    }
 
-  /* Camera preview */
-  #camera-preview {
-    position: fixed;
-    bottom: 20px; left: 20px;
-    z-index: 20;
-    width: 200px;
-  }
+    #cam-label.active { color: rgba(0,255,136,0.8); }
 
-  #camera-label {
-    font-size: 8px;
-    letter-spacing: 3px;
-    color: #0088aa;
-    margin-bottom: 4px;
-  }
-
-  #camera-frame {
-    position: relative;
-    width: 200px;
-    height: 150px;
-    border: 1px solid #00ffff33;
-    border-radius: 6px;
-    overflow: hidden;
-    background: #001111;
-  }
-
-  #camera-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1);
-    display: none;
-  }
-
-  #landmark-canvas {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%;
-    height: 100%;
-  }
-
-  /* Corner decorations */
-  .corner {
-    position: absolute;
-    width: 10px; height: 10px;
-    border-color: #00ffff;
-    border-style: solid;
-    opacity: 0.7;
-  }
-  .corner.tl { top: 3px; left: 3px; border-width: 2px 0 0 2px; }
-  .corner.tr { top: 3px; right: 3px; border-width: 2px 2px 0 0; }
-  .corner.bl { bottom: 3px; left: 3px; border-width: 0 0 2px 2px; }
-  .corner.br { bottom: 3px; right: 3px; border-width: 0 2px 2px 0; }
-
-  /* Loading / error */
-  #overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: #000;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-  }
-
-  #overlay.hidden { display: none; }
-
-  #overlay h1 {
-    font-size: 22px;
-    letter-spacing: 4px;
-    color: #00ffff;
-    text-shadow: 0 0 20px #00ffff;
-  }
-
-  #overlay p {
-    font-size: 12px;
-    letter-spacing: 2px;
-    color: #0088aa;
-    max-width: 400px;
-    text-align: center;
-    line-height: 1.8;
-  }
-
-  #loading-bar-bg {
-    width: 300px;
-    height: 4px;
-    background: #001a1a;
-    border: 1px solid #003333;
-  }
-
-  #loading-bar {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #00aaff, #00ffff);
-    box-shadow: 0 0 8px #00ffff;
-    transition: width 0.4s;
-  }
-
-  #loading-text {
-    font-size: 10px;
-    letter-spacing: 3px;
-    color: #0088aa;
-    text-align: center;
-  }
-
-  /* Decorative HUD lines */
-  #hud-lines {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: 5;
-  }
-</style>
+    .corner {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-color: rgba(0,255,255,0.3);
+      border-style: solid;
+      z-index: 3;
+    }
+    .corner.tl { top: 6px; left: 6px; border-width: 1px 0 0 1px; }
+    .corner.tr { top: 6px; right: 6px; border-width: 1px 1px 0 0; }
+    .corner.bl { bottom: 6px; left: 6px; border-width: 0 0 1px 1px; }
+    .corner.br { bottom: 6px; right: 6px; border-width: 0 1px 1px 0; }
+  </style>
 </head>
 <body>
 
-<!-- Loading overlay -->
-<div id="overlay">
-  <h1>MECHATRONIC HAND v1.0</h1>
-  <div id="loading-bar-bg"><div id="loading-bar"></div></div>
-  <div id="loading-text">INITIALIZING SYSTEMS...</div>
-  <p id="overlay-msg">Loading neural tracking modules and 3D subsystems...</p>
-</div>
-
-<!-- Main UI -->
 <div id="canvas-container">
-  <canvas id="renderer-canvas"></canvas>
+  <canvas id="three-canvas"></canvas>
 </div>
 
-<div id="scanlines"></div>
-
-<!-- SVG decorative lines -->
-<svg id="hud-lines" xmlns="http://www.w3.org/2000/svg">
-  <line x1="0" y1="60%" x2="5%" y2="60%" stroke="#00ffff22" stroke-width="1"/>
-  <line x1="95%" y1="40%" x2="100%" y2="40%" stroke="#00ffff22" stroke-width="1"/>
-  <line x1="50%" y1="0" x2="50%" y2="2%" stroke="#00ffff11" stroke-width="1"/>
-</svg>
-
-<div id="title">
-  MECHATRONIC HAND v1.0
-  <div id="subtitle">NEURAL TRACKING INTERFACE</div>
-</div>
-
-<div id="status-panel">
-  <div class="status-row">
-    <span>WEBGL</span>
-    <div class="status-dot" id="dot-webgl"></div>
+<div id="hud">
+  <div id="title-block">
+    <div id="title">PHANTOM HAND</div>
+    <div id="subtitle">Landmark Primitives &middot; Floating Physics</div>
   </div>
-  <div class="status-row">
-    <span>CAMERA</span>
-    <div class="status-dot" id="dot-camera"></div>
+  <div id="status-block">
+    <div id="status-dot"></div>
+    <div id="status-text">NO HAND DETECTED</div>
   </div>
-  <div class="status-row">
-    <span>TRACKING</span>
-    <div class="status-dot" id="dot-tracking"></div>
+  <div id="stats-block">
+    <div class="stat-line">OBJECTS <span class="stat-val" id="obj-count">--</span></div>
+    <div class="stat-line">FPS <span class="stat-val" id="fps-display">--</span></div>
   </div>
-</div>
-
-<div id="finger-hud">
-  <div class="hud-title">JOINT DATA // DEGREES</div>
-  <div class="finger-row">
-    <span class="finger-label">THUMB</span>
-    <div class="finger-bar-bg"><div class="finger-bar" id="bar-thumb"></div></div>
-    <span class="finger-pct" id="pct-thumb">0%</span>
-  </div>
-  <div class="finger-row">
-    <span class="finger-label">INDEX</span>
-    <div class="finger-bar-bg"><div class="finger-bar" id="bar-index"></div></div>
-    <span class="finger-pct" id="pct-index">0%</span>
-  </div>
-  <div class="finger-row">
-    <span class="finger-label">MIDDLE</span>
-    <div class="finger-bar-bg"><div class="finger-bar" id="bar-middle"></div></div>
-    <span class="finger-pct" id="pct-middle">0%</span>
-  </div>
-  <div class="finger-row">
-    <span class="finger-label">RING</span>
-    <div class="finger-bar-bg"><div class="finger-bar" id="bar-ring"></div></div>
-    <span class="finger-pct" id="pct-ring">0%</span>
-  </div>
-  <div class="finger-row">
-    <span class="finger-label">PINKY</span>
-    <div class="finger-bar-bg"><div class="finger-bar" id="bar-pinky"></div></div>
-    <span class="finger-pct" id="pct-pinky">0%</span>
-  </div>
-</div>
-
-<div id="debugPanel" style="
-    position: fixed; top: 120px; right: 10px;
-    background: rgba(0,0,0,0.75);
-    color: #00ff88;
-    font-family: monospace;
-    font-size: 11px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid #00ff8844;
-    z-index: 1000;
-    min-width: 180px;
-    line-height: 1.6;
-    pointer-events: none;
-">
-    <div style="color:#88ffff;margin-bottom:4px">DEBUG</div>
-    <div id="dbg-index">index: --</div>
-    <div id="dbg-middle">middle: --</div>
-    <div id="dbg-ring">ring: --</div>
-    <div id="dbg-pinky">pinky: --</div>
-    <div id="dbg-thumb">thumb: --</div>
-    <div id="dbg-wrist" style="margin-top:4px;color:#ffff88">wrist: --</div>
-    <div id="dbg-quat" style="color:#ff8888">quat: --</div>
 </div>
 
 <div id="camera-preview">
-  <div id="camera-label">◈ CAMERA FEED</div>
-  <div id="camera-frame">
-    <video id="camera-video" playsinline autoplay muted></video>
-    <canvas id="landmark-canvas"></canvas>
-    <div class="corner tl"></div>
-    <div class="corner tr"></div>
-    <div class="corner bl"></div>
-    <div class="corner br"></div>
-  </div>
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+  <video id="webcam" autoplay muted playsinline></video>
+  <canvas id="landmark-canvas"></canvas>
+  <div id="cam-label">NO HAND DETECTED</div>
 </div>
 
-<!-- Three.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-
-<!-- Three.js Postprocessing (EffectComposer, RenderPass, UnrealBloomPass) via CDN -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/EffectComposer.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/RenderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/ShaderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/shaders/CopyShader.js"></script>
-
+<!-- Three.js r128 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
 <script>
+// ================================================================
+//  PHANTOM HAND — Three.js landmark primitives + floating physics
+// ================================================================
+
+// ── MediaPipe hand skeleton connections ──────────────────────────
+const HAND_CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],          // thumb
+  [0,5],[5,6],[6,7],[7,8],          // index
+  [0,9],[9,10],[10,11],[11,12],     // middle
+  [0,13],[13,14],[14,15],[15,16],   // ring
+  [0,17],[17,18],[18,19],[19,20],   // pinky
+  [5,9],[9,13],[13,17]              // palm cross
+];
+
+// Emissive colors per finger (as hex numbers for Three.js)
+const FINGER_COLORS = {
+  wrist:  0xffffff,
+  thumb:  0xff6600,
+  index:  0x00ffff,
+  middle: 0xff00ff,
+  ring:   0xffff00,
+  pinky:  0x00ff88,
+};
+
+function fingerForLandmark(i) {
+  if (i === 0)               return 'wrist';
+  if (i >= 1  && i <= 4)    return 'thumb';
+  if (i >= 5  && i <= 8)    return 'index';
+  if (i >= 9  && i <= 12)   return 'middle';
+  if (i >= 13 && i <= 16)   return 'ring';
+  return 'pinky';
+}
+
+// ── Utility ──────────────────────────────────────────────────────
+const rand   = (a, b) => a + Math.random() * (b - a);
+const randInt = (a, b) => Math.floor(rand(a, b + 0.999));
+
+function randomOnSphere(r) {
+  const theta = 2 * Math.PI * Math.random();
+  const phi   = Math.acos(2 * Math.random() - 1);
+  return new THREE.Vector3(
+    r * Math.sin(phi) * Math.cos(theta),
+    r * Math.sin(phi) * Math.sin(theta),
+    r * Math.cos(phi)
+  );
+}
+
+// ================================================================
+//  THREE.JS SETUP
+// ================================================================
+
+const canvas   = document.getElementById('three-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 1);
+
+const scene  = new THREE.Scene();
+scene.fog    = new THREE.FogExp2(0x000000, 0.035);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 0, 5);
+
+// ── Lighting ─────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x111111, 1.0));
+
+[
+  { color: 0x00ffff, pos: [ 4,  3,  2], i: 2.5 },
+  { color: 0xff00ff, pos: [-4,  2,  2], i: 2.0 },
+  { color: 0x0033ff, pos: [ 0, -4,  1], i: 1.8 },
+  { color: 0xff6600, pos: [ 2, -2, -2], i: 1.5 },
+].forEach(({ color, pos, i }) => {
+  const pl = new THREE.PointLight(color, i, 20);
+  pl.position.set(...pos);
+  scene.add(pl);
+});
+
+// ── Starfield ────────────────────────────────────────────────────
 (function() {
-  'use strict';
-
-  // ─── PROGRESS ───────────────────────────────────────────────────────────────
-  const loadingBar = document.getElementById('loading-bar');
-  const loadingText = document.getElementById('loading-text');
-  const overlayMsg = document.getElementById('overlay-msg');
-
-  function setProgress(pct, msg) {
-    loadingBar.style.width = pct + '%';
-    if (msg) loadingText.textContent = msg;
+  const N   = 700;
+  const buf = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const p = randomOnSphere(rand(9, 15));
+    buf[i * 3] = p.x; buf[i * 3 + 1] = p.y; buf[i * 3 + 2] = p.z;
   }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(buf, 3));
+  scene.add(new THREE.Points(geo,
+    new THREE.PointsMaterial({ color: 0xffffff, size: 0.025, transparent: true, opacity: 0.45 })
+  ));
+})();
 
-  function setDot(id, state) {
-    const el = document.getElementById('dot-' + id);
-    el.className = 'status-dot' + (state ? ' ' + state : '');
-  }
+// ================================================================
+//  HAND LANDMARK MESHES
+// ================================================================
 
-  // ─── THREE.JS SETUP ──────────────────────────────────────────────────────────
-  setProgress(10, 'INITIALIZING WEBGL RENDERER...');
+const jointGroup = new THREE.Group();
+const lineGroup  = new THREE.Group();
+scene.add(jointGroup);
+scene.add(lineGroup);
 
-  const canvas = document.getElementById('renderer-canvas');
-  let renderer, scene, camera, composer;
-
-  try {
-    renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: false,
-      powerPreference: 'high-performance'
-    });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.toneMapping = THREE.ReinhardToneMapping;
-    renderer.toneMappingExposure = 1.2;
-    setDot('webgl', 'active');
-  } catch (e) {
-    document.getElementById('overlay-msg').textContent = '⚠ WebGL is not available in your browser. Please use Chrome or Firefox with hardware acceleration enabled.';
-    loadingText.textContent = 'WEBGL ERROR';
-    return;
-  }
-
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);
-  scene.fog = new THREE.FogExp2(0x000000, 0.08);
-
-  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 1.5, 6);
-  camera.lookAt(0, 0, 0);
-
-  // Lights
-  const ambientLight = new THREE.AmbientLight(0x334466, 0.9);
-  scene.add(ambientLight);
-
-  const hemiLight = new THREE.HemisphereLight(0x6688aa, 0x112233, 0.8);
-  scene.add(hemiLight);
-
-  const keyLight = new THREE.DirectionalLight(0x4488ff, 2.0);
-  keyLight.position.set(3, 5, 3);
-  scene.add(keyLight);
-
-  const fillLight = new THREE.DirectionalLight(0x00ffff, 1.5);
-  fillLight.position.set(-4, 2, -2);
-  scene.add(fillLight);
-
-  const rimLight = new THREE.PointLight(0x00aaff, 1.5, 15);
-  rimLight.position.set(0, 4, -3);
-  scene.add(rimLight);
-
-  // Grid floor
-  const gridHelper = new THREE.GridHelper(20, 40, 0x001133, 0x000a1a);
-  gridHelper.position.y = -3;
-  scene.add(gridHelper);
-
-  setProgress(20, 'BUILDING BLOOM PIPELINE...');
-
-  // Post-processing
-  let bloomPass;
-  try {
-    const renderScene = new THREE.RenderPass(scene, camera);
-    bloomPass = new THREE.UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.8,   // strength
-      0.4,   // radius
-      0.85   // threshold
-    );
-    composer = new THREE.EffectComposer(renderer);
-    composer.addPass(renderScene);
-    composer.addPass(bloomPass);
-  } catch(e) {
-    composer = null;
-    console.warn('Bloom not available:', e);
-  }
-
-  setProgress(30, 'ASSEMBLING MECHATRONIC HAND...');
-
-  // ─── MATERIALS ───────────────────────────────────────────────────────────────
-  const matChrome = new THREE.MeshStandardMaterial({
-    color: 0x8899aa,
-    metalness: 0.6,
+// 21 icosahedron joints
+const jointMeshes = Array.from({ length: 21 }, (_, i) => {
+  const color = FINGER_COLORS[fingerForLandmark(i)];
+  const mat   = new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 0.9,
+    metalness: 0.4,
     roughness: 0.3,
-    envMapIntensity: 1.0
   });
+  const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.06, 1), mat);
+  mesh.visible = false;
+  jointGroup.add(mesh);
+  return mesh;
+});
 
-  const matDarkMetal = new THREE.MeshStandardMaterial({
-    color: 0x223344,
-    metalness: 0.9,
-    roughness: 0.25
+// Connection lines
+const connectionLines = HAND_CONNECTIONS.map(([a, b]) => {
+  const pts = [new THREE.Vector3(), new THREE.Vector3()];
+  const geo  = new THREE.BufferGeometry().setFromPoints(pts);
+  const color = FINGER_COLORS[fingerForLandmark(a)];
+  const mat  = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6 });
+  const line = new THREE.Line(geo, mat);
+  line.visible = false;
+  lineGroup.add(line);
+  return { line, a, b };
+});
+
+// Current 3-D landmark positions
+let landmarkPositions = null;
+
+function updateHandMeshes(landmarks) {
+  landmarkPositions = landmarks.map(lm => new THREE.Vector3(
+    (lm.x - 0.5) * 6,
+    -(lm.y - 0.5) * 6,
+    -lm.z * 3
+  ));
+  for (let i = 0; i < 21; i++) {
+    jointMeshes[i].position.copy(landmarkPositions[i]);
+    jointMeshes[i].visible = true;
+  }
+  connectionLines.forEach(({ line, a, b }) => {
+    const pos = line.geometry.attributes.position;
+    const pa = landmarkPositions[a], pb = landmarkPositions[b];
+    pos.setXYZ(0, pa.x, pa.y, pa.z);
+    pos.setXYZ(1, pb.x, pb.y, pb.z);
+    pos.needsUpdate = true;
+    line.visible = true;
   });
+}
 
-  const matJoint = new THREE.MeshStandardMaterial({
-    color: 0x1a2a3a,
-    metalness: 0.85,
-    roughness: 0.3
+function hideHandMeshes() {
+  jointMeshes.forEach(m => { m.visible = false; });
+  connectionLines.forEach(({ line }) => { line.visible = false; });
+  landmarkPositions = null;
+}
+
+// ================================================================
+//  FLOATING OBJECTS
+// ================================================================
+
+const GEO_POOL = [
+  new THREE.BoxGeometry(0.2, 0.2, 0.2),
+  new THREE.TetrahedronGeometry(0.15),
+  new THREE.OctahedronGeometry(0.15),
+  new THREE.DodecahedronGeometry(0.12),
+  new THREE.TorusGeometry(0.12, 0.04, 8, 16),
+  new THREE.IcosahedronGeometry(0.13, 0),
+];
+
+const FLOAT_COUNT   = 35;
+const floatGroup    = new THREE.Group();
+const floatObjects  = [];
+scene.add(floatGroup);
+
+function makeObject() {
+  const geo   = GEO_POOL[randInt(0, GEO_POOL.length - 1)];
+  const color = new THREE.Color().setHSL(Math.random(), 0.55, 0.55);
+  const mat   = new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 0.15,
+    metalness: 0.8,
+    roughness: 0.3,
   });
+  const mesh = new THREE.Mesh(geo, mat);
+  const pos  = randomOnSphere(rand(2.5, 5.0));
+  mesh.position.copy(pos);
+  floatGroup.add(mesh);
 
-  const matGlow = new THREE.MeshStandardMaterial({
-    color: 0x003344,
-    emissive: new THREE.Color(0x004466),
-    emissiveIntensity: 0.6,
-    metalness: 0.5,
-    roughness: 0.5
-  });
+  const inward = pos.clone().negate().normalize().multiplyScalar(rand(0.02, 0.08));
+  const jitter = new THREE.Vector3(rand(-0.05, 0.05), rand(-0.05, 0.05), rand(-0.05, 0.05));
 
-  const matScrew = new THREE.MeshStandardMaterial({
-    color: 0x556677,
-    metalness: 1.0,
-    roughness: 0.05
-  });
-
-  // ─── HELPER: build a finger segment ─────────────────────────────────────────
-  function buildSegment(w, h, d) {
-    const group = new THREE.Group();
-
-    // Main panel
-    const geo = new THREE.BoxGeometry(w, h, d);
-    const mesh = new THREE.Mesh(geo, matChrome);
-    group.add(mesh);
-
-    // Emissive edge strip (thin box on front face)
-    const stripGeo = new THREE.BoxGeometry(w * 0.85, h * 0.05, d * 0.02);
-    const strip = new THREE.Mesh(stripGeo, matGlow);
-    strip.position.set(0, h * 0.4, d * 0.51);
-    group.add(strip);
-
-    const stripB = new THREE.Mesh(stripGeo, matGlow);
-    stripB.position.set(0, -h * 0.4, d * 0.51);
-    group.add(stripB);
-
-    // Side detail strips
-    const sideStripGeo = new THREE.BoxGeometry(w * 0.02, h * 0.7, d * 0.85);
-    const sideL = new THREE.Mesh(sideStripGeo, matGlow);
-    sideL.position.set(-w * 0.51, 0, 0);
-    group.add(sideL);
-
-    const sideR = new THREE.Mesh(sideStripGeo, matGlow);
-    sideR.position.set(w * 0.51, 0, 0);
-    group.add(sideR);
-
-    // Screws on front face
-    const screwGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.015, 8);
-    const screwPositions = [
-      [w * 0.3, h * 0.3],
-      [-w * 0.3, h * 0.3],
-      [w * 0.3, -h * 0.3],
-      [-w * 0.3, -h * 0.3]
-    ];
-    screwPositions.forEach(([sx, sy]) => {
-      const screw = new THREE.Mesh(screwGeo, matScrew);
-      screw.rotation.x = Math.PI / 2;
-      screw.position.set(sx, sy, d * 0.52);
-      group.add(screw);
-    });
-
-    // Panel line groove
-    const grooveGeo = new THREE.BoxGeometry(w * 0.9, h * 0.01, d * 0.03);
-    const groove = new THREE.Mesh(grooveGeo, matDarkMetal);
-    groove.position.set(0, 0, d * 0.5);
-    group.add(groove);
-
-    return group;
-  }
-
-  // ─── HELPER: build a knuckle joint ──────────────────────────────────────────
-  function buildKnuckle(radius, width) {
-    const group = new THREE.Group();
-    const geo = new THREE.CylinderGeometry(radius, radius, width, 12);
-    const mesh = new THREE.Mesh(geo, matJoint);
-    mesh.rotation.z = Math.PI / 2;
-    group.add(mesh);
-
-    // Ring detail
-    const ringGeo = new THREE.CylinderGeometry(radius * 1.08, radius * 1.08, width * 0.15, 12);
-    const ring = new THREE.Mesh(ringGeo, matGlow);
-    ring.rotation.z = Math.PI / 2;
-    ring.position.x = 0;
-    group.add(ring);
-
-    return group;
-  }
-
-  // ─── BUILD THE FULL HAND ─────────────────────────────────────────────────────
-  const handRoot = new THREE.Group();
-  // Mirror the hand to match user view (MediaPipe camera is mirrored)
-  handRoot.scale.x = -1;
-  scene.add(handRoot);
-
-  // Palm
-  const palmGroup = new THREE.Group();
-  const palmGeo = new THREE.BoxGeometry(1.0, 0.18, 1.2);
-  const palmMesh = new THREE.Mesh(palmGeo, matChrome);
-  palmGroup.add(palmMesh);
-
-  // Palm emissive lines
-  for (let i = -2; i <= 2; i++) {
-    const lineGeo = new THREE.BoxGeometry(0.01, 0.2, 0.9);
-    const line = new THREE.Mesh(lineGeo, matGlow);
-    line.position.set(i * 0.22, 0, 0);
-    palmGroup.add(line);
-  }
-
-  // Palm screw details
-  const palmScrewPositions = [
-    [0.42, 0.5], [-0.42, 0.5], [0.42, -0.5], [-0.42, -0.5],
-    [0, 0.55], [0, -0.55]
-  ];
-  palmScrewPositions.forEach(([sx, sz]) => {
-    const sg = new THREE.CylinderGeometry(0.015, 0.015, 0.02, 8);
-    const sm = new THREE.Mesh(sg, matScrew);
-    sm.rotation.x = Math.PI / 2;
-    sm.position.set(sx, 0.1, sz);
-    palmGroup.add(sm);
-  });
-
-  palmGroup.rotation.x = -Math.PI / 2;
-  handRoot.add(palmGroup);
-
-  // ─── FINGER BUILDER ──────────────────────────────────────────────────────────
-  // Returns { pivot1, pivot2, pivot3 } (THREE.Group with rotation pivot at base)
-  function buildFinger(proxW, proxH, proxD,
-                        midW, midH, midD,
-                        distW, distH, distD,
-                        knuckleR) {
-    // Proximal phalange
-    const p1 = new THREE.Group(); // MCP joint pivot
-    const seg1 = buildSegment(proxW, proxH, proxD);
-    seg1.position.y = proxD / 2;
-    p1.add(seg1);
-
-    const k1 = buildKnuckle(knuckleR, proxW * 0.85);
-    k1.position.y = proxD;
-    p1.add(k1);
-
-    // Middle phalange
-    const p2 = new THREE.Group(); // PIP joint pivot
-    p2.position.y = proxD;
-    const seg2 = buildSegment(midW, midH, midD);
-    seg2.position.y = midD / 2;
-    p2.add(seg2);
-
-    const k2 = buildKnuckle(knuckleR * 0.88, midW * 0.8);
-    k2.position.y = midD;
-    p2.add(k2);
-
-    p1.add(p2);
-
-    // Distal phalange
-    const p3 = new THREE.Group(); // DIP joint pivot
-    p3.position.y = midD;
-    const seg3 = buildSegment(distW, distH, distD);
-    seg3.position.y = distD / 2;
-
-    // Fingertip cap
-    const tipGeo = new THREE.SphereGeometry(distW * 0.45, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2);
-    const tip = new THREE.Mesh(tipGeo, matChrome);
-    tip.position.y = distD;
-    tip.rotation.x = Math.PI;
-    p3.add(seg3);
-    p3.add(tip);
-
-    p2.add(p3);
-
-    return { p1, p2, p3 };
-  }
-
-  // ─── DEFINE 5 FINGERS ────────────────────────────────────────────────────────
-  const fingers = {};
-
-  // INDEX
-  {
-    const f = buildFinger(0.17, 0.16, 0.38,
-                           0.15, 0.14, 0.28,
-                           0.13, 0.12, 0.22, 0.09);
-    f.p1.position.set(-0.3, 0, 0.55);
-    palmGroup.add(f.p1);
-    fingers.index = f;
-  }
-  // MIDDLE
-  {
-    const f = buildFinger(0.17, 0.16, 0.42,
-                           0.15, 0.14, 0.31,
-                           0.13, 0.12, 0.24, 0.09);
-    f.p1.position.set(-0.1, 0, 0.57);
-    palmGroup.add(f.p1);
-    fingers.middle = f;
-  }
-  // RING
-  {
-    const f = buildFinger(0.16, 0.15, 0.38,
-                           0.14, 0.13, 0.28,
-                           0.12, 0.11, 0.22, 0.085);
-    f.p1.position.set(0.1, 0, 0.54);
-    palmGroup.add(f.p1);
-    fingers.ring = f;
-  }
-  // PINKY
-  {
-    const f = buildFinger(0.13, 0.12, 0.30,
-                           0.11, 0.10, 0.22,
-                           0.10, 0.09, 0.17, 0.07);
-    f.p1.position.set(0.3, 0, 0.48);
-    palmGroup.add(f.p1);
-    fingers.pinky = f;
-  }
-  // THUMB
-  {
-    const f = buildFinger(0.18, 0.17, 0.28,
-                           0.16, 0.15, 0.24,
-                           0.14, 0.13, 0.20, 0.095);
-    f.p1.position.set(-0.46, 0, 0.15);
-    f.p1.rotation.z = Math.PI / 3;  // angle outward
-    f.p1.rotation.x = -Math.PI / 8;
-    palmGroup.add(f.p1);
-    fingers.thumb = f;
-  }
-
-  setProgress(50, 'CALIBRATING TRACKING ARRAYS...');
-
-  // ─── FINGER BEND STATES ──────────────────────────────────────────────────────
-  const bendState = {
-    thumb: { mcp: 0, pip: 0, dip: 0 },
-    index: { mcp: 0, pip: 0, dip: 0 },
-    middle: { mcp: 0, pip: 0, dip: 0 },
-    ring: { mcp: 0, pip: 0, dip: 0 },
-    pinky: { mcp: 0, pip: 0, dip: 0 }
+  return {
+    mesh,
+    velocity:        inward.add(jitter),
+    angularVelocity: new THREE.Vector3(rand(-0.6, 0.6), rand(-0.6, 0.6), rand(-0.6, 0.6)),
+    age:    0,
+    maxAge: rand(15, 40),
+    needsRespawn: false,
   };
+}
 
-  // Target bends from tracking
-  const bendTarget = {
-    thumb: { mcp: 0, pip: 0, dip: 0 },
-    index: { mcp: 0, pip: 0, dip: 0 },
-    middle: { mcp: 0, pip: 0, dip: 0 },
-    ring: { mcp: 0, pip: 0, dip: 0 },
-    pinky: { mcp: 0, pip: 0, dip: 0 }
-  };
+function respawnObject(obj) {
+  const pos = randomOnSphere(rand(4.5, 5.5));
+  obj.mesh.position.copy(pos);
+  const inward = pos.clone().negate().normalize().multiplyScalar(rand(0.02, 0.07));
+  const jitter = new THREE.Vector3(rand(-0.04, 0.04), rand(-0.04, 0.04), rand(-0.04, 0.04));
+  obj.velocity.copy(inward.add(jitter));
+  obj.angularVelocity.set(rand(-0.6, 0.6), rand(-0.6, 0.6), rand(-0.6, 0.6));
+  obj.age          = 0;
+  obj.maxAge       = rand(15, 40);
+  obj.needsRespawn = false;
+  obj.mesh.material.emissiveIntensity = 0.15;
+}
 
-  const LERP = 0.35;
+for (let i = 0; i < FLOAT_COUNT; i++) floatObjects.push(makeObject());
 
-  // Wrist orientation targets (now using quaternion for full 3D rotation)
-  let wristTargetQuat = new THREE.Quaternion();
-  let wristCurrentQuat = new THREE.Quaternion();
+// Scratch vectors (avoid per-frame allocation)
+const _push    = new THREE.Vector3();
+const _wristP  = new THREE.Vector3();
+const COLL_R   = 0.25;
+const PUSH_STR = 0.15;
+const GRAV_STR = 0.003;
 
-  // Hand position tracking
-  let handTargetPos = new THREE.Vector3(0, 0, 0);
-  let handCurrentPos = new THREE.Vector3(0, 0, 0);
+function tickFloating(dt) {
+  const hasHand = landmarkPositions !== null;
+  if (hasHand) _wristP.copy(landmarkPositions[0]);
 
-  // Debug logging throttle state
-  let lastDebugLog = 0;
+  floatObjects.forEach(obj => {
+    obj.age += dt;
 
-  // ─── MEDIAPIPE SETUP ─────────────────────────────────────────────────────────
-  const videoEl = document.getElementById('camera-video');
-  const landmarkCanvas = document.getElementById('landmark-canvas');
-  const lmCtx = landmarkCanvas.getContext('2d');
-  landmarkCanvas.width = 200;
-  landmarkCanvas.height = 150;
-
-  // Helper: compute angle between three points
-  function angleBetween(a, b, c) {
-    const ab = { x: a.x - b.x, y: a.y - b.y, z: (a.z || 0) - (b.z || 0) };
-    const cb = { x: c.x - b.x, y: c.y - b.y, z: (c.z || 0) - (b.z || 0) };
-    const dot = ab.x * cb.x + ab.y * cb.y + ab.z * cb.z;
-    const magAB = Math.sqrt(ab.x ** 2 + ab.y ** 2 + ab.z ** 2);
-    const magCB = Math.sqrt(cb.x ** 2 + cb.y ** 2 + cb.z ** 2);
-    if (magAB === 0 || magCB === 0) return 0;
-    const cosA = Math.max(-1, Math.min(1, dot / (magAB * magCB)));
-    return Math.acos(cosA);
-  }
-
-  // Map landmark angle to bend (0=straight, 1=fully bent)
-  function bendFromAngle(angle, minA = 2.8, maxA = 1.0) {
-    return Math.max(0, Math.min(1, (angle - minA) / (maxA - minA)));
-  }
-
-  // Compute full 3D hand orientation from landmarks
-  function getHandOrientation(landmarks) {
-    // Extract key landmarks with coordinate flip for MediaPipe mirror
-    // MediaPipe gives us: x (0-1, left-right, mirrored), y (0-1, top-bottom), z (depth)
-    const wrist = new THREE.Vector3(
-      landmarks[0].x,
-      -landmarks[0].y,
-      -landmarks[0].z * 0.5  // scale depth
-    );
-    const indexMCP = new THREE.Vector3(
-      landmarks[5].x,
-      -landmarks[5].y,
-      -landmarks[5].z * 0.5
-    );
-    const middleMCP = new THREE.Vector3(
-      landmarks[9].x,
-      -landmarks[9].y,
-      -landmarks[9].z * 0.5
-    );
-    const pinkyMCP = new THREE.Vector3(
-      landmarks[17].x,
-      -landmarks[17].y,
-      -landmarks[17].z * 0.5
-    );
-
-    // Compute hand coordinate frame
-    // Forward: direction from wrist to middle finger base
-    const forward = new THREE.Vector3().subVectors(middleMCP, wrist).normalize();
-
-    // Right: direction across knuckles (from pinky to index)
-    const right = new THREE.Vector3().subVectors(indexMCP, pinkyMCP).normalize();
-
-    // Up: perpendicular to palm plane
-    const up = new THREE.Vector3().crossVectors(forward, right).normalize();
-
-    // Recompute right to ensure orthogonality
-    const correctedRight = new THREE.Vector3().crossVectors(up, forward).normalize();
-
-    // Build rotation matrix from basis vectors
-    const matrix = new THREE.Matrix4();
-    matrix.makeBasis(correctedRight, forward, up);
-
-    // Extract quaternion from matrix
-    const q = new THREE.Quaternion().setFromRotationMatrix(matrix);
-    const pitch180 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
-    return q.multiply(pitch180);
-  }
-
-  function onHandResults(results) {
-    // Draw landmarks on preview canvas
-    lmCtx.clearRect(0, 0, 200, 150);
-
-    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-      setDot('tracking', 'active');
-      const lm = results.multiHandLandmarks[0];
-
-      // Draw connection lines
-      lmCtx.strokeStyle = 'rgba(0,255,255,0.5)';
-      lmCtx.lineWidth = 1;
-      const connections = [
-        [0,1],[1,2],[2,3],[3,4],
-        [0,5],[5,6],[6,7],[7,8],
-        [9,10],[10,11],[11,12],
-        [13,14],[14,15],[15,16],
-        [0,17],[17,18],[18,19],[19,20],
-        [5,9],[9,13],[13,17]
-      ];
-      connections.forEach(([a, b]) => {
-        lmCtx.beginPath();
-        // mirror x for display
-        lmCtx.moveTo((1 - lm[a].x) * 200, lm[a].y * 150);
-        lmCtx.lineTo((1 - lm[b].x) * 200, lm[b].y * 150);
-        lmCtx.stroke();
-      });
-
-      // Draw dots
-      lm.forEach((pt, i) => {
-        lmCtx.beginPath();
-        lmCtx.arc((1 - pt.x) * 200, pt.y * 150, i === 0 ? 3 : 2, 0, Math.PI * 2);
-        lmCtx.fillStyle = i === 0 ? '#ff00ff' : '#00ffff';
-        lmCtx.fill();
-      });
-
-      // ── Compute bends ────────────────────────────────────────────────
-      // THUMB: 1-2-3, 2-3-4
-      bendTarget.thumb.mcp = bendFromAngle(angleBetween(lm[0], lm[1], lm[2]), 2.9, 1.5);
-      bendTarget.thumb.pip = bendFromAngle(angleBetween(lm[1], lm[2], lm[3]), 2.9, 1.4);
-      bendTarget.thumb.dip = bendFromAngle(angleBetween(lm[2], lm[3], lm[4]), 2.9, 1.4);
-
-      // INDEX: 5-6-7, 6-7-8
-      bendTarget.index.mcp = bendFromAngle(angleBetween(lm[0], lm[5], lm[6]), 2.7, 1.1);
-      bendTarget.index.pip = bendFromAngle(angleBetween(lm[5], lm[6], lm[7]), 2.8, 1.0);
-      bendTarget.index.dip = bendFromAngle(angleBetween(lm[6], lm[7], lm[8]), 2.9, 1.0);
-
-      // MIDDLE: 9-10-11, 10-11-12
-      bendTarget.middle.mcp = bendFromAngle(angleBetween(lm[0], lm[9], lm[10]), 2.7, 1.1);
-      bendTarget.middle.pip = bendFromAngle(angleBetween(lm[9], lm[10], lm[11]), 2.8, 1.0);
-      bendTarget.middle.dip = bendFromAngle(angleBetween(lm[10], lm[11], lm[12]), 2.9, 1.0);
-
-      // RING: 13-14-15, 14-15-16
-      bendTarget.ring.mcp = bendFromAngle(angleBetween(lm[0], lm[13], lm[14]), 2.7, 1.1);
-      bendTarget.ring.pip = bendFromAngle(angleBetween(lm[13], lm[14], lm[15]), 2.8, 1.0);
-      bendTarget.ring.dip = bendFromAngle(angleBetween(lm[14], lm[15], lm[16]), 2.9, 1.0);
-
-      // PINKY: 17-18-19, 18-19-20
-      bendTarget.pinky.mcp = bendFromAngle(angleBetween(lm[0], lm[17], lm[18]), 2.7, 1.1);
-      bendTarget.pinky.pip = bendFromAngle(angleBetween(lm[17], lm[18], lm[19]), 2.8, 1.0);
-      bendTarget.pinky.dip = bendFromAngle(angleBetween(lm[18], lm[19], lm[20]), 2.9, 1.0);
-
-      // ── Wrist orientation & position ───────────────────────────────
-      // Compute full 3D hand orientation from landmark configuration
-      wristTargetQuat.copy(getHandOrientation(lm));
-
-      // Map wrist landmark position to screen space movement
-      // Center of screen = (0.5, 0.5), map to -2 to +2 in X, -1.5 to +1.5 in Y
-      const wx = (0.5 - lm[0].x) * 4;
-      const wy = (0.5 - lm[0].y) * 3;
-      handTargetPos.set(wx, wy, 0);
-
-      // ── Debug panel (every frame) ─────────────────────────────────────
-      const _R2D = 180 / Math.PI;
-      const _bScale = MAX_BEND_ANGLE * _R2D;
-      document.getElementById('dbg-index').textContent =
-        `index: ${(bendTarget.index.mcp * _bScale).toFixed(0)}° ${(bendTarget.index.pip * _bScale).toFixed(0)}° ${(bendTarget.index.dip * _bScale).toFixed(0)}°`;
-      document.getElementById('dbg-middle').textContent =
-        `middle: ${(bendTarget.middle.mcp * _bScale).toFixed(0)}° ${(bendTarget.middle.pip * _bScale).toFixed(0)}° ${(bendTarget.middle.dip * _bScale).toFixed(0)}°`;
-      document.getElementById('dbg-ring').textContent =
-        `ring: ${(bendTarget.ring.mcp * _bScale).toFixed(0)}° ${(bendTarget.ring.pip * _bScale).toFixed(0)}° ${(bendTarget.ring.dip * _bScale).toFixed(0)}°`;
-      document.getElementById('dbg-pinky').textContent =
-        `pinky: ${(bendTarget.pinky.mcp * _bScale).toFixed(0)}° ${(bendTarget.pinky.pip * _bScale).toFixed(0)}° ${(bendTarget.pinky.dip * _bScale).toFixed(0)}°`;
-      document.getElementById('dbg-thumb').textContent =
-        `thumb: ${(bendTarget.thumb.mcp * _bScale).toFixed(0)}° ${(bendTarget.thumb.pip * _bScale).toFixed(0)}° ${(bendTarget.thumb.dip * _bScale).toFixed(0)}°`;
-      document.getElementById('dbg-wrist').textContent =
-        `wrist x:${lm[0].x.toFixed(2)} y:${lm[0].y.toFixed(2)}`;
-      document.getElementById('dbg-quat').textContent =
-        `q: ${handRoot.quaternion.x.toFixed(2)} ${handRoot.quaternion.y.toFixed(2)} ${handRoot.quaternion.z.toFixed(2)}`;
-
-      // ── Throttled console log (once per second) ────────────────────────
-      const _now = Date.now();
-      if (_now - lastDebugLog > 1000) {
-        lastDebugLog = _now;
-        console.log('=== HAND DEBUG ===', {
-          wrist:     { x: lm[0].x.toFixed(3),  y: lm[0].y.toFixed(3),  z: lm[0].z.toFixed(3) },
-          indexTip:  { x: lm[8].x.toFixed(3),  y: lm[8].y.toFixed(3),  z: lm[8].z.toFixed(3) },
-          middleTip: { x: lm[12].x.toFixed(3), y: lm[12].y.toFixed(3), z: lm[12].z.toFixed(3) },
-          fingerBends: {
-            thumb:  [(bendTarget.thumb.mcp  * _bScale).toFixed(1), (bendTarget.thumb.pip  * _bScale).toFixed(1), (bendTarget.thumb.dip  * _bScale).toFixed(1)],
-            index:  [(bendTarget.index.mcp  * _bScale).toFixed(1), (bendTarget.index.pip  * _bScale).toFixed(1), (bendTarget.index.dip  * _bScale).toFixed(1)],
-            middle: [(bendTarget.middle.mcp * _bScale).toFixed(1), (bendTarget.middle.pip * _bScale).toFixed(1), (bendTarget.middle.dip * _bScale).toFixed(1)],
-            ring:   [(bendTarget.ring.mcp   * _bScale).toFixed(1), (bendTarget.ring.pip   * _bScale).toFixed(1), (bendTarget.ring.dip   * _bScale).toFixed(1)],
-            pinky:  [(bendTarget.pinky.mcp  * _bScale).toFixed(1), (bendTarget.pinky.pip  * _bScale).toFixed(1), (bendTarget.pinky.dip  * _bScale).toFixed(1)]
-          },
-          boneRotations: {
-            index_p1: fingers.index.p1.rotation.x.toFixed(3),
-            index_p2: fingers.index.p2.rotation.x.toFixed(3),
-            index_p3: fingers.index.p3.rotation.x.toFixed(3)
-          },
-          handQuat: {
-            x: handRoot.quaternion.x.toFixed(3),
-            y: handRoot.quaternion.y.toFixed(3),
-            z: handRoot.quaternion.z.toFixed(3),
-            w: handRoot.quaternion.w.toFixed(3)
-          }
-        });
-      }
-
-    } else {
-      setDot('tracking', '');
-      lmCtx.fillStyle = 'rgba(0,20,30,0.5)';
-      lmCtx.fillRect(0, 0, 200, 150);
-      lmCtx.fillStyle = '#0088aa';
-      lmCtx.font = '9px Courier New';
-      lmCtx.textAlign = 'center';
-      lmCtx.fillText('NO HAND DETECTED', 100, 75);
+    // Gravitate toward wrist
+    if (hasHand) {
+      _push.copy(_wristP).sub(obj.mesh.position).normalize();
+      obj.velocity.addScaledVector(_push, GRAV_STR);
     }
-  }
 
-  // Update HUD bars
-  function updateHUD() {
-    const fingerKeys = ['thumb', 'index', 'middle', 'ring', 'pinky'];
-    fingerKeys.forEach(k => {
-      const avg = (bendState[k].mcp + bendState[k].pip + bendState[k].dip) / 3;
-      const pct = Math.round(avg * 100);
-      document.getElementById('bar-' + k).style.width = pct + '%';
-      document.getElementById('pct-' + k).textContent = pct + '%';
-    });
-  }
+    // Integrate position
+    obj.mesh.position.addScaledVector(obj.velocity, dt);
 
-  // Apply bends to hand geometry
-  const MAX_BEND_ANGLE = Math.PI * 0.78; // ~140 degrees
+    // Tumble
+    obj.mesh.rotation.x += obj.angularVelocity.x * dt;
+    obj.mesh.rotation.y += obj.angularVelocity.y * dt;
+    obj.mesh.rotation.z += obj.angularVelocity.z * dt;
 
-  function applyBends() {
-    // Lerp all states
-    const names = ['thumb', 'index', 'middle', 'ring', 'pinky'];
-    names.forEach(n => {
-      bendState[n].mcp += (bendTarget[n].mcp - bendState[n].mcp) * LERP;
-      bendState[n].pip += (bendTarget[n].pip - bendState[n].pip) * LERP;
-      bendState[n].dip += (bendTarget[n].dip - bendState[n].dip) * LERP;
-    });
+    // Light drag
+    obj.velocity.multiplyScalar(0.998);
+    const spd = obj.velocity.length();
+    if (spd > 0.5) obj.velocity.multiplyScalar(0.5 / spd);
 
-    // Apply to finger pivots
-    // -Math.PI/2 offset on curl axis so rest pose (bend=0) is fully extended flat
-    // Index
-    fingers.index.p1.rotation.x = -Math.PI / 2 + (-bendState.index.mcp * MAX_BEND_ANGLE);
-    fingers.index.p2.rotation.x = -Math.PI / 2 + (-bendState.index.pip * MAX_BEND_ANGLE);
-    fingers.index.p3.rotation.x = -Math.PI / 2 + (-bendState.index.dip * MAX_BEND_ANGLE);
-
-    // Middle
-    fingers.middle.p1.rotation.x = -Math.PI / 2 + (-bendState.middle.mcp * MAX_BEND_ANGLE);
-    fingers.middle.p2.rotation.x = -Math.PI / 2 + (-bendState.middle.pip * MAX_BEND_ANGLE);
-    fingers.middle.p3.rotation.x = -Math.PI / 2 + (-bendState.middle.dip * MAX_BEND_ANGLE);
-
-    // Ring
-    fingers.ring.p1.rotation.x = -Math.PI / 2 + (-bendState.ring.mcp * MAX_BEND_ANGLE);
-    fingers.ring.p2.rotation.x = -Math.PI / 2 + (-bendState.ring.pip * MAX_BEND_ANGLE);
-    fingers.ring.p3.rotation.x = -Math.PI / 2 + (-bendState.ring.dip * MAX_BEND_ANGLE);
-
-    // Pinky
-    fingers.pinky.p1.rotation.x = -Math.PI / 2 + (-bendState.pinky.mcp * MAX_BEND_ANGLE);
-    fingers.pinky.p2.rotation.x = -Math.PI / 2 + (-bendState.pinky.pip * MAX_BEND_ANGLE);
-    fingers.pinky.p3.rotation.x = -Math.PI / 2 + (-bendState.pinky.dip * MAX_BEND_ANGLE);
-
-    // Thumb (different axis due to orientation)
-    fingers.thumb.p1.rotation.y = -Math.PI / 2 + (-bendState.thumb.mcp * MAX_BEND_ANGLE * 0.5);
-    fingers.thumb.p2.rotation.y = -Math.PI / 2 + (-bendState.thumb.pip * MAX_BEND_ANGLE * 0.6);
-    fingers.thumb.p3.rotation.y = -Math.PI / 2 + (-bendState.thumb.dip * MAX_BEND_ANGLE * 0.5);
-
-    // Wrist rotation with quaternion slerp for smooth 3D free rotation
-    wristCurrentQuat.slerp(wristTargetQuat, 0.15);
-    handRoot.quaternion.copy(wristCurrentQuat);
-
-    // Position tracking with lerp
-    handCurrentPos.x += (handTargetPos.x - handCurrentPos.x) * 0.2;
-    handCurrentPos.y += (handTargetPos.y - handCurrentPos.y) * 0.2;
-    handRoot.position.copy(handCurrentPos);
-  }
-
-  // ─── INIT MEDIAPIPE ───────────────────────────────────────────────────────────
-  setProgress(65, 'LOADING NEURAL TRACKING MODEL...');
-
-  let handsInstance = null;
-  let mpCamera = null;
-
-  function initMediaPipe() {
-    try {
-      handsInstance = new Hands({
-        locateFile: (file) => {
-          return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+    // Hand collision
+    if (hasHand) {
+      landmarkPositions.forEach(lm => {
+        const d = obj.mesh.position.distanceTo(lm);
+        if (d < COLL_R && d > 0.001) {
+          _push.copy(obj.mesh.position).sub(lm).normalize();
+          obj.velocity.addScaledVector(_push, PUSH_STR * (COLL_R - d) / COLL_R);
+          obj.mesh.material.emissiveIntensity = 1.0;
         }
       });
-
-      handsInstance.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.6
-      });
-
-      handsInstance.onResults(onHandResults);
-
-      mpCamera = new Camera(videoEl, {
-        onFrame: async () => {
-          if (handsInstance) {
-            await handsInstance.send({ image: videoEl });
-          }
-        },
-        width: 320,
-        height: 240
-      });
-
-      mpCamera.start().then(() => {
-        videoEl.style.display = 'block';
-        setDot('camera', 'active');
-        setProgress(100, 'SYSTEM ONLINE');
-        setTimeout(() => {
-          document.getElementById('overlay').classList.add('hidden');
-        }, 600);
-      }).catch(err => {
-        console.warn('Camera error:', err);
-        setDot('camera', 'error');
-        overlayMsg.textContent = '⚠ Camera access denied or unavailable. Allow camera access and refresh the page.\n\nThe 3D hand model will still animate with a demo pattern.';
-        loadingText.textContent = 'CAMERA OFFLINE — DEMO MODE';
-        setProgress(100, 'DEMO MODE ACTIVE');
-        setTimeout(() => {
-          document.getElementById('overlay').classList.add('hidden');
-        }, 2000);
-        startDemoAnimation();
-      });
-
-    } catch(e) {
-      console.warn('MediaPipe init error:', e);
-      overlayMsg.textContent = '⚠ Hand tracking unavailable. Running demo animation mode.';
-      loadingText.textContent = 'DEMO MODE ACTIVE';
-      setProgress(100, 'DEMO MODE');
-      setTimeout(() => {
-        document.getElementById('overlay').classList.add('hidden');
-      }, 2000);
-      startDemoAnimation();
     }
+
+    // Decay glow
+    obj.mesh.material.emissiveIntensity *= 0.9;
+    if (obj.mesh.material.emissiveIntensity < 0.15)
+      obj.mesh.material.emissiveIntensity = 0.15;
+
+    // Boundary / age → respawn
+    if (obj.mesh.position.length() > 7 || obj.age > obj.maxAge)
+      obj.needsRespawn = true;
+
+    if (obj.needsRespawn) respawnObject(obj);
+  });
+}
+
+// ================================================================
+//  RENDER LOOP
+// ================================================================
+
+const statusDot  = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+const camLabel   = document.getElementById('cam-label');
+const objCountEl = document.getElementById('obj-count');
+const fpsEl      = document.getElementById('fps-display');
+
+let lastTime   = performance.now();
+let fpsBuf     = [];
+let frame      = 0;
+let pulseT     = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const now = performance.now();
+  const dt  = Math.min((now - lastTime) / 1000, 0.1);
+  lastTime  = now;
+
+  // FPS sampling
+  fpsBuf.push(1 / dt);
+  if (fpsBuf.length > 30) fpsBuf.shift();
+  if (++frame % 15 === 0) {
+    fpsEl.textContent      = Math.round(fpsBuf.reduce((a, b) => a + b, 0) / fpsBuf.length);
+    objCountEl.textContent = FLOAT_COUNT;
   }
 
-  // ─── DEMO ANIMATION (when no camera) ─────────────────────────────────────────
-  function startDemoAnimation() {
-    setDot('camera', 'error');
-    setDot('tracking', '');
-    lmCtx.fillStyle = '#001111';
-    lmCtx.fillRect(0, 0, 200, 150);
-    lmCtx.fillStyle = '#0088aa';
-    lmCtx.font = '8px Courier New';
-    lmCtx.textAlign = 'center';
-    lmCtx.fillText('DEMO MODE', 100, 70);
-    lmCtx.fillText('NO CAMERA', 100, 82);
-  }
-
-  let demoTime = 0;
-
-  function updateDemoAnimation() {
-    demoTime += 0.01;
-    // Wave fingers in and out in a nice pattern
-    const names = ['thumb', 'index', 'middle', 'ring', 'pinky'];
-    const offsets = [0, 0.3, 0.6, 0.9, 1.2];
-    names.forEach((n, i) => {
-      const t = (Math.sin(demoTime * 1.2 + offsets[i]) + 1) * 0.5;
-      bendTarget[n].mcp = t * 0.7;
-      bendTarget[n].pip = t * 0.9;
-      bendTarget[n].dip = t * 0.8;
+  // Landmark pulse
+  pulseT += dt * 2.2;
+  const pulse = 0.55 + 0.45 * Math.sin(pulseT);
+  if (landmarkPositions) {
+    jointMeshes.forEach(m => {
+      m.material.emissiveIntensity = pulse;
+      m.scale.setScalar(0.88 + 0.12 * pulse);
     });
-    // Demo rotation: create a quaternion from Euler angles for smooth wave
-    const euler = new THREE.Euler(
-      Math.sin(demoTime * 0.2) * 0.15,
-      Math.sin(demoTime * 0.3) * 0.4,
-      Math.sin(demoTime * 0.15) * 0.1,
-      'XYZ'
-    );
-    wristTargetQuat.setFromEuler(euler);
-
-    // Demo position: subtle side-to-side and up-down
-    handTargetPos.x = Math.sin(demoTime * 0.25) * 0.5;
-    handTargetPos.y = Math.cos(demoTime * 0.18) * 0.3;
   }
 
-  // ─── RENDER LOOP ─────────────────────────────────────────────────────────────
-  let isDemo = false;
-  const clock = new THREE.Clock();
+  // Very slow scene drift
+  floatGroup.rotation.y += 0.00035;
 
-  function animate() {
-    requestAnimationFrame(animate);
+  tickFloating(dt);
+  renderer.render(scene, camera);
+}
 
-    const t = clock.getElapsedTime();
+animate();
 
-    // Subtle idle bob
-    handRoot.position.y = Math.sin(t * 0.8) * 0.05;
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 
-    // Check if demo mode (no camera / tracking)
-    if (!mpCamera || document.getElementById('dot-camera').classList.contains('error')) {
-      updateDemoAnimation();
-    }
+// ================================================================
+//  MEDIAPIPE HANDS
+// ================================================================
 
-    applyBends();
-    updateHUD();
+const videoEl  = document.getElementById('webcam');
+const lmCanvas = document.getElementById('landmark-canvas');
+const lmCtx    = lmCanvas.getContext('2d');
 
-    // Pulsing glow on rimLight
-    rimLight.intensity = 0.8 + Math.sin(t * 2) * 0.2;
+function sizePreviewCanvas() {
+  const el = document.getElementById('camera-preview');
+  lmCanvas.width  = el.offsetWidth;
+  lmCanvas.height = el.offsetHeight;
+}
+sizePreviewCanvas();
+window.addEventListener('resize', sizePreviewCanvas);
 
-    if (composer) {
-      composer.render();
-    } else {
-      renderer.render(scene, camera);
-    }
-  }
+let isTracking = false;
 
-  // ─── RESIZE HANDLER ──────────────────────────────────────────────────────────
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    if (composer) composer.setSize(window.innerWidth, window.innerHeight);
+function setTracking(active) {
+  if (active === isTracking) return;
+  isTracking = active;
+  statusDot.classList.toggle('active', active);
+  const msg = active ? 'HAND TRACKING ACTIVE' : 'NO HAND DETECTED';
+  statusText.textContent = msg;
+  camLabel.textContent   = msg;
+  camLabel.classList.toggle('active', active);
+}
+
+function drawPreviewLandmarks(landmarks) {
+  lmCtx.clearRect(0, 0, lmCanvas.width, lmCanvas.height);
+  if (!landmarks) return;
+  const W = lmCanvas.width, H = lmCanvas.height;
+
+  // Connections
+  HAND_CONNECTIONS.forEach(([a, b]) => {
+    const la = landmarks[a], lb = landmarks[b];
+    const hexStr = '#' + FINGER_COLORS[fingerForLandmark(a)].toString(16).padStart(6, '0');
+    lmCtx.strokeStyle = hexStr;
+    lmCtx.lineWidth   = 1;
+    lmCtx.globalAlpha = 0.65;
+    lmCtx.beginPath();
+    lmCtx.moveTo(la.x * W, la.y * H);
+    lmCtx.lineTo(lb.x * W, lb.y * H);
+    lmCtx.stroke();
   });
 
-  // ─── BOOT SEQUENCE ───────────────────────────────────────────────────────────
-  setProgress(80, 'HANDSHAKING WITH CAMERA API...');
+  // Joints
+  landmarks.forEach((lm, i) => {
+    const hexStr = '#' + FINGER_COLORS[fingerForLandmark(i)].toString(16).padStart(6, '0');
+    lmCtx.globalAlpha = 1;
+    lmCtx.fillStyle   = hexStr;
+    lmCtx.shadowColor = hexStr;
+    lmCtx.shadowBlur  = 6;
+    lmCtx.beginPath();
+    lmCtx.arc(lm.x * W, lm.y * H, i === 0 ? 4 : 3, 0, Math.PI * 2);
+    lmCtx.fill();
+    lmCtx.shadowBlur = 0;
+  });
+  lmCtx.globalAlpha = 1;
+}
 
-  animate();
+// Init MediaPipe Hands
+const hands = new Hands({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
+});
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence:  0.6,
+});
+hands.onResults(results => {
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const lm = results.multiHandLandmarks[0];
+    updateHandMeshes(lm);
+    drawPreviewLandmarks(lm);
+    setTracking(true);
+  } else {
+    hideHandMeshes();
+    drawPreviewLandmarks(null);
+    setTracking(false);
+  }
+});
 
-  setTimeout(() => {
-    initMediaPipe();
-  }, 500);
-
-})();
+// Start webcam via MediaPipe Camera
+const mpCamera = new Camera(videoEl, {
+  onFrame: async () => { await hands.send({ image: videoEl }); },
+  width:  640,
+  height: 480,
+});
+mpCamera.start().catch(err => {
+  console.warn('Camera error:', err);
+  statusText.textContent = 'CAMERA UNAVAILABLE';
+});
 </script>
 </body>
 </html>
