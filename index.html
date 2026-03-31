@@ -511,23 +511,23 @@
   function buildSegment(w, h, d) {
     const group = new THREE.Group();
 
-    // Main panel
-    const geo = new THREE.BoxGeometry(w, h, d);
+    // Main panel — d is the bone-length axis (Y), h is the face depth (Z)
+    const geo = new THREE.BoxGeometry(w, d, h);
     const mesh = new THREE.Mesh(geo, matChrome);
     group.add(mesh);
 
-    // Emissive edge strip (thin box on front face)
-    const stripGeo = new THREE.BoxGeometry(w * 0.85, h * 0.05, d * 0.02);
+    // Emissive edge strip (thin box on front face, near top and bottom)
+    const stripGeo = new THREE.BoxGeometry(w * 0.85, d * 0.05, h * 0.02);
     const strip = new THREE.Mesh(stripGeo, matGlow);
-    strip.position.set(0, h * 0.4, d * 0.51);
+    strip.position.set(0, d * 0.4, h * 0.51);
     group.add(strip);
 
     const stripB = new THREE.Mesh(stripGeo, matGlow);
-    stripB.position.set(0, -h * 0.4, d * 0.51);
+    stripB.position.set(0, -d * 0.4, h * 0.51);
     group.add(stripB);
 
     // Side detail strips
-    const sideStripGeo = new THREE.BoxGeometry(w * 0.02, h * 0.7, d * 0.85);
+    const sideStripGeo = new THREE.BoxGeometry(w * 0.02, d * 0.85, h * 0.7);
     const sideL = new THREE.Mesh(sideStripGeo, matGlow);
     sideL.position.set(-w * 0.51, 0, 0);
     group.add(sideL);
@@ -539,22 +539,22 @@
     // Screws on front face
     const screwGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.015, 8);
     const screwPositions = [
-      [w * 0.3, h * 0.3],
-      [-w * 0.3, h * 0.3],
-      [w * 0.3, -h * 0.3],
-      [-w * 0.3, -h * 0.3]
+      [w * 0.3, d * 0.3],
+      [-w * 0.3, d * 0.3],
+      [w * 0.3, -d * 0.3],
+      [-w * 0.3, -d * 0.3]
     ];
     screwPositions.forEach(([sx, sy]) => {
       const screw = new THREE.Mesh(screwGeo, matScrew);
       screw.rotation.x = Math.PI / 2;
-      screw.position.set(sx, sy, d * 0.52);
+      screw.position.set(sx, sy, h * 0.52);
       group.add(screw);
     });
 
     // Panel line groove
-    const grooveGeo = new THREE.BoxGeometry(w * 0.9, h * 0.01, d * 0.03);
+    const grooveGeo = new THREE.BoxGeometry(w * 0.9, d * 0.01, h * 0.03);
     const groove = new THREE.Mesh(grooveGeo, matDarkMetal);
-    groove.position.set(0, 0, d * 0.5);
+    groove.position.set(0, 0, h * 0.5);
     group.add(groove);
 
     return group;
@@ -811,8 +811,8 @@
 
     // Extract quaternion from matrix
     const q = new THREE.Quaternion().setFromRotationMatrix(matrix);
-    const yaw180 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
-    return q.multiply(yaw180);
+    const pitch180 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
+    return q.multiply(pitch180);
   }
 
   function onHandResults(results) {
