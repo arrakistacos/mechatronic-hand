@@ -357,7 +357,7 @@ let modelsReady     = false;
 
 // Fallback geometries (used immediately; swapped out when GLBs load)
 function makeFallbackSkull() {
-  const geo = new THREE.IcosahedronGeometry(0.06, 1);
+  const geo = new THREE.IcosahedronGeometry(0.12, 1);
   const mat = new THREE.MeshStandardMaterial({
     color: 0xddddcc, emissive: 0xaaaaaa, emissiveIntensity: 0.5,
     metalness: 0.3, roughness: 0.4
@@ -366,7 +366,7 @@ function makeFallbackSkull() {
 }
 
 function makeFallbackPumpkin() {
-  const geo = new THREE.IcosahedronGeometry(0.06, 1);
+  const geo = new THREE.IcosahedronGeometry(0.12, 1);
   const mat = new THREE.MeshStandardMaterial({
     color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 0.5,
     metalness: 0.3, roughness: 0.4
@@ -383,9 +383,11 @@ const loader = new THREE.GLTFLoader();
 
 loader.load('./skull.glb', (gltf) => {
   skullTemplate = gltf.scene;
-  skullTemplate.scale.setScalar(0.08);
+  skullTemplate.scale.setScalar(0.25);
   // Swap existing skull markers for new template clones
   rebuildHandMarkers('Left');
+  // Ensure all existing clones have the correct scale
+  handData.Left.markers.forEach(m => m.scale.setScalar(0.25));
   console.log('skull.glb loaded');
 }, undefined, () => {
   console.warn('skull.glb not found — using fallback icosahedron');
@@ -393,9 +395,11 @@ loader.load('./skull.glb', (gltf) => {
 
 loader.load('./pumpkin.glb', (gltf) => {
   pumpkinTemplate = gltf.scene;
-  pumpkinTemplate.scale.setScalar(0.08);
+  pumpkinTemplate.scale.setScalar(0.25);
   // Swap existing pumpkin markers for new template clones
   rebuildHandMarkers('Right');
+  // Ensure all existing clones have the correct scale
+  handData.Right.markers.forEach(m => m.scale.setScalar(0.25));
   console.log('pumpkin.glb loaded');
 }, undefined, () => {
   console.warn('pumpkin.glb not found — using fallback icosahedron');
@@ -528,7 +532,7 @@ function animate() {
     const d = handData[label];
     if (d.positions) {
       d.markers.forEach(m => {
-        m.scale.setScalar((0.88 + 0.12 * pulse) * (label === 'Left' ? 1.0 : 1.0));
+        m.scale.setScalar(0.25 * (0.88 + 0.12 * pulse));
       });
     }
   });
