@@ -428,18 +428,21 @@
   camera.lookAt(0, 0, 0);
 
   // Lights
-  const ambientLight = new THREE.AmbientLight(0x111122, 0.5);
+  const ambientLight = new THREE.AmbientLight(0x334466, 0.9);
   scene.add(ambientLight);
 
-  const keyLight = new THREE.DirectionalLight(0x4488ff, 1.5);
+  const hemiLight = new THREE.HemisphereLight(0x6688aa, 0x112233, 0.8);
+  scene.add(hemiLight);
+
+  const keyLight = new THREE.DirectionalLight(0x4488ff, 2.0);
   keyLight.position.set(3, 5, 3);
   scene.add(keyLight);
 
-  const fillLight = new THREE.DirectionalLight(0x00ffff, 0.4);
+  const fillLight = new THREE.DirectionalLight(0x00ffff, 1.5);
   fillLight.position.set(-4, 2, -2);
   scene.add(fillLight);
 
-  const rimLight = new THREE.PointLight(0x00aaff, 1.0, 15);
+  const rimLight = new THREE.PointLight(0x00aaff, 1.5, 15);
   rimLight.position.set(0, 4, -3);
   scene.add(rimLight);
 
@@ -473,8 +476,8 @@
   // ─── MATERIALS ───────────────────────────────────────────────────────────────
   const matChrome = new THREE.MeshStandardMaterial({
     color: 0x8899aa,
-    metalness: 0.95,
-    roughness: 0.1,
+    metalness: 0.6,
+    roughness: 0.3,
     envMapIntensity: 1.0
   });
 
@@ -827,9 +830,9 @@
       const dy = mBase.y - wrist.y;
       const dz = (mBase.z || 0) - (wrist.z || 0);
 
-      wristTargetRot.y = (wrist.x - 0.5) * 1.2;
+      wristTargetRot.y = -(wrist.x - 0.5) * 1.2;
       wristTargetRot.x = (wrist.y - 0.5) * 0.8;
-      wristTargetRot.z = -Math.atan2(dx, -dy) + Math.PI;
+      wristTargetRot.z = Math.atan2(-dx, -dy);
 
     } else {
       setDot('tracking', '');
