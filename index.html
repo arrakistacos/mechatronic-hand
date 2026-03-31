@@ -649,7 +649,12 @@ hands.onResults(results => {
 
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     results.multiHandLandmarks.forEach((lm, i) => {
-      const label = results.multiHandedness[i].label; // "Left" or "Right"
+      // MediaPipe reports handedness from the camera's perspective (mirrored for a
+      // front-facing / selfie camera).  "Left" from the model means the hand is on
+      // the LEFT of the raw video feed, which is the user's RIGHT hand — and vice
+      // versa.  Flip the label so skull = user's left hand, pumpkin = user's right.
+      const mpLabel = results.multiHandedness[i].label; // "Left" or "Right" (camera POV)
+      const label   = mpLabel === 'Left' ? 'Right' : 'Left'; // flip to user POV
       updateHandMeshes(label, lm);
 
       const lineCol = label === 'Left' ? PREVIEW_SKULL : PREVIEW_PUMPKIN;
