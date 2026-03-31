@@ -580,6 +580,8 @@
 
   // ─── BUILD THE FULL HAND ─────────────────────────────────────────────────────
   const handRoot = new THREE.Group();
+  // Mirror the hand to match user view (MediaPipe camera is mirrored)
+  handRoot.scale.x = -1;
   scene.add(handRoot);
 
   // Palm
@@ -733,9 +735,13 @@
 
   const LERP = 0.35;
 
-  // Wrist orientation targets
-  let wristTargetRot = new THREE.Euler(0, 0, 0);
-  let wristCurrentRot = new THREE.Euler(0, 0, 0);
+  // Wrist orientation targets (now using quaternion for full 3D rotation)
+  let wristTargetQuat = new THREE.Quaternion();
+  let wristCurrentQuat = new THREE.Quaternion();
+
+  // Hand position tracking
+  let handTargetPos = new THREE.Vector3(0, 0, 0);
+  let handCurrentPos = new THREE.Vector3(0, 0, 0);
 
   // ─── MEDIAPIPE SETUP ─────────────────────────────────────────────────────────
   const videoEl = document.getElementById('camera-video');
@@ -759,6 +765,52 @@
   // Map landmark angle to bend (0=straight, 1=fully bent)
   function bendFromAngle(angle, minA = 2.8, maxA = 1.0) {
     return Math.max(0, Math.min(1, (angle - minA) / (maxA - minA)));
+  }
+
+  // Compute full 3D hand orientation from landmarks
+  function getHandOrientation(landmarks) {
+    // Extract key landmarks with coordinate flip for MediaPipe mirror
+    // MediaPipe gives us: x (0-1, left-right, mirrored), y (0-1, top-bottom), z (depth)
+    const wrist = new THREE.Vector3(
+      landmarks[0].x,
+      -landmarks[0].y,
+      -landmarks[0].z * 0.5  // scale depth
+    );
+    const indexMCP = new THREE.Vector3(
+      landmarks[5].x,
+      -landmarks[5].y,
+      -landmarks[5].z * 0.5
+    );
+    const middleMCP = new THREE.Vector3(
+      landmarks[9].x,
+      -landmarks[9].y,
+      -landmarks[9].z * 0.5
+    );
+    const pinkyMCP = new THREE.Vector3(
+      landmarks[17].x,
+      -landmarks[17].y,
+      -landmarks[17].z * 0.5
+    );
+
+    // Compute hand coordinate frame
+    // Forward: direction from wrist to middle finger base
+    const forward = new THREE.Vector3().subVectors(middleMCP, wrist).normalize();
+
+    // Right: direction across knuckles (from pinky to index)
+    const right = new THREE.Vector3().subVectors(indexMCP, pinkyMCP).normalize();
+
+    // Up: perpendicular to palm plane
+    const up = new THREE.Vector3().crossVectors(forward, right).normalize();
+
+    // Recompute right to ensure orthogonality
+    const correctedRight = new THREE.Vector3().crossVectors(up, forward).normalize();
+
+    // Build rotation matrix from basis vectors
+    const matrix = new THREE.Matrix4();
+    matrix.makeBasis(correctedRight, forward, up);
+
+    // Extract quaternion from matrix
+    return new THREE.Quaternion().setFromRotationMatrix(matrix);
   }
 
   function onHandResults(results) {
@@ -822,17 +874,15 @@
       bendTarget.pinky.pip = bendFromAngle(angleBetween(lm[17], lm[18], lm[19]), 2.8, 1.0);
       bendTarget.pinky.dip = bendFromAngle(angleBetween(lm[18], lm[19], lm[20]), 2.9, 1.0);
 
-      // ── Wrist orientation ──────────────────────────────────────────
-      // Use wrist (0) and middle-finger base (9) for orientation
-      const wrist = lm[0];
-      const mBase = lm[9];
-      const dx = mBase.x - wrist.x;
-      const dy = mBase.y - wrist.y;
-      const dz = (mBase.z || 0) - (wrist.z || 0);
+      // ── Wrist orientation & position ───────────────────────────────
+      // Compute full 3D hand orientation from landmark configuration
+      wristTargetQuat.copy(getHandOrientation(lm));
 
-      wristTargetRot.y = -(wrist.x - 0.5) * 1.2;
-      wristTargetRot.x = (wrist.y - 0.5) * 0.8;
-      wristTargetRot.z = Math.atan2(-dx, -dy);
+      // Map wrist landmark position to screen space movement
+      // Center of screen = (0.5, 0.5), map to -2 to +2 in X, -1.5 to +1.5 in Y
+      const wx = (0.5 - lm[0].x) * 4;
+      const wy = (0.5 - lm[0].y) * 3;
+      handTargetPos.set(wx, wy, 0);
 
     } else {
       setDot('tracking', '');
@@ -894,14 +944,14 @@
     fingers.thumb.p2.rotation.y = -bendState.thumb.pip * MAX_BEND_ANGLE * 0.6;
     fingers.thumb.p3.rotation.y = -bendState.thumb.dip * MAX_BEND_ANGLE * 0.5;
 
-    // Wrist rotation with lerp
-    wristCurrentRot.x += (wristTargetRot.x - wristCurrentRot.x) * 0.08;
-    wristCurrentRot.y += (wristTargetRot.y - wristCurrentRot.y) * 0.08;
-    wristCurrentRot.z += (wristTargetRot.z - wristCurrentRot.z) * 0.08;
+    // Wrist rotation with quaternion slerp for smooth 3D free rotation
+    wristCurrentQuat.slerp(wristTargetQuat, 0.15);
+    handRoot.quaternion.copy(wristCurrentQuat);
 
-    handRoot.rotation.x = wristCurrentRot.x;
-    handRoot.rotation.y = wristCurrentRot.y;
-    handRoot.rotation.z = wristCurrentRot.z;
+    // Position tracking with lerp
+    handCurrentPos.x += (handTargetPos.x - handCurrentPos.x) * 0.2;
+    handCurrentPos.y += (handTargetPos.y - handCurrentPos.y) * 0.2;
+    handRoot.position.copy(handCurrentPos);
   }
 
   // ─── INIT MEDIAPIPE ───────────────────────────────────────────────────────────
@@ -994,9 +1044,18 @@
       bendTarget[n].pip = t * 0.9;
       bendTarget[n].dip = t * 0.8;
     });
-    wristTargetRot.y = Math.sin(demoTime * 0.3) * 0.4;
-    wristTargetRot.x = Math.sin(demoTime * 0.2) * 0.15;
-    wristTargetRot.z = Math.sin(demoTime * 0.15) * 0.1;
+    // Demo rotation: create a quaternion from Euler angles for smooth wave
+    const euler = new THREE.Euler(
+      Math.sin(demoTime * 0.2) * 0.15,
+      Math.sin(demoTime * 0.3) * 0.4,
+      Math.sin(demoTime * 0.15) * 0.1,
+      'XYZ'
+    );
+    wristTargetQuat.setFromEuler(euler);
+
+    // Demo position: subtle side-to-side and up-down
+    handTargetPos.x = Math.sin(demoTime * 0.25) * 0.5;
+    handTargetPos.y = Math.cos(demoTime * 0.18) * 0.3;
   }
 
   // ─── RENDER LOOP ─────────────────────────────────────────────────────────────
