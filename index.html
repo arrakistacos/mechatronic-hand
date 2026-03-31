@@ -511,23 +511,23 @@
   function buildSegment(w, h, d) {
     const group = new THREE.Group();
 
-    // Main panel — d is the bone-length axis (Y), h is the face depth (Z)
-    const geo = new THREE.BoxGeometry(w, d, h);
+    // Main panel
+    const geo = new THREE.BoxGeometry(w, h, d);
     const mesh = new THREE.Mesh(geo, matChrome);
     group.add(mesh);
 
-    // Emissive edge strip (thin box on front face, near top and bottom)
-    const stripGeo = new THREE.BoxGeometry(w * 0.85, d * 0.05, h * 0.02);
+    // Emissive edge strip (thin box on front face)
+    const stripGeo = new THREE.BoxGeometry(w * 0.85, h * 0.05, d * 0.02);
     const strip = new THREE.Mesh(stripGeo, matGlow);
-    strip.position.set(0, d * 0.4, h * 0.51);
+    strip.position.set(0, h * 0.4, d * 0.51);
     group.add(strip);
 
     const stripB = new THREE.Mesh(stripGeo, matGlow);
-    stripB.position.set(0, -d * 0.4, h * 0.51);
+    stripB.position.set(0, -h * 0.4, d * 0.51);
     group.add(stripB);
 
     // Side detail strips
-    const sideStripGeo = new THREE.BoxGeometry(w * 0.02, d * 0.85, h * 0.7);
+    const sideStripGeo = new THREE.BoxGeometry(w * 0.02, h * 0.7, d * 0.85);
     const sideL = new THREE.Mesh(sideStripGeo, matGlow);
     sideL.position.set(-w * 0.51, 0, 0);
     group.add(sideL);
@@ -539,22 +539,22 @@
     // Screws on front face
     const screwGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.015, 8);
     const screwPositions = [
-      [w * 0.3, d * 0.3],
-      [-w * 0.3, d * 0.3],
-      [w * 0.3, -d * 0.3],
-      [-w * 0.3, -d * 0.3]
+      [w * 0.3, h * 0.3],
+      [-w * 0.3, h * 0.3],
+      [w * 0.3, -h * 0.3],
+      [-w * 0.3, -h * 0.3]
     ];
     screwPositions.forEach(([sx, sy]) => {
       const screw = new THREE.Mesh(screwGeo, matScrew);
       screw.rotation.x = Math.PI / 2;
-      screw.position.set(sx, sy, h * 0.52);
+      screw.position.set(sx, sy, d * 0.52);
       group.add(screw);
     });
 
     // Panel line groove
-    const grooveGeo = new THREE.BoxGeometry(w * 0.9, d * 0.01, h * 0.03);
+    const grooveGeo = new THREE.BoxGeometry(w * 0.9, h * 0.01, d * 0.03);
     const groove = new THREE.Mesh(grooveGeo, matDarkMetal);
-    groove.position.set(0, 0, h * 0.5);
+    groove.position.set(0, 0, d * 0.5);
     group.add(groove);
 
     return group;
@@ -921,30 +921,31 @@
     });
 
     // Apply to finger pivots
+    // -Math.PI/2 offset on curl axis so rest pose (bend=0) is fully extended flat
     // Index
-    fingers.index.p1.rotation.x = -bendState.index.mcp * MAX_BEND_ANGLE;
-    fingers.index.p2.rotation.x = -bendState.index.pip * MAX_BEND_ANGLE;
-    fingers.index.p3.rotation.x = -bendState.index.dip * MAX_BEND_ANGLE;
+    fingers.index.p1.rotation.x = -Math.PI / 2 + (-bendState.index.mcp * MAX_BEND_ANGLE);
+    fingers.index.p2.rotation.x = -Math.PI / 2 + (-bendState.index.pip * MAX_BEND_ANGLE);
+    fingers.index.p3.rotation.x = -Math.PI / 2 + (-bendState.index.dip * MAX_BEND_ANGLE);
 
     // Middle
-    fingers.middle.p1.rotation.x = -bendState.middle.mcp * MAX_BEND_ANGLE;
-    fingers.middle.p2.rotation.x = -bendState.middle.pip * MAX_BEND_ANGLE;
-    fingers.middle.p3.rotation.x = -bendState.middle.dip * MAX_BEND_ANGLE;
+    fingers.middle.p1.rotation.x = -Math.PI / 2 + (-bendState.middle.mcp * MAX_BEND_ANGLE);
+    fingers.middle.p2.rotation.x = -Math.PI / 2 + (-bendState.middle.pip * MAX_BEND_ANGLE);
+    fingers.middle.p3.rotation.x = -Math.PI / 2 + (-bendState.middle.dip * MAX_BEND_ANGLE);
 
     // Ring
-    fingers.ring.p1.rotation.x = -bendState.ring.mcp * MAX_BEND_ANGLE;
-    fingers.ring.p2.rotation.x = -bendState.ring.pip * MAX_BEND_ANGLE;
-    fingers.ring.p3.rotation.x = -bendState.ring.dip * MAX_BEND_ANGLE;
+    fingers.ring.p1.rotation.x = -Math.PI / 2 + (-bendState.ring.mcp * MAX_BEND_ANGLE);
+    fingers.ring.p2.rotation.x = -Math.PI / 2 + (-bendState.ring.pip * MAX_BEND_ANGLE);
+    fingers.ring.p3.rotation.x = -Math.PI / 2 + (-bendState.ring.dip * MAX_BEND_ANGLE);
 
     // Pinky
-    fingers.pinky.p1.rotation.x = -bendState.pinky.mcp * MAX_BEND_ANGLE;
-    fingers.pinky.p2.rotation.x = -bendState.pinky.pip * MAX_BEND_ANGLE;
-    fingers.pinky.p3.rotation.x = -bendState.pinky.dip * MAX_BEND_ANGLE;
+    fingers.pinky.p1.rotation.x = -Math.PI / 2 + (-bendState.pinky.mcp * MAX_BEND_ANGLE);
+    fingers.pinky.p2.rotation.x = -Math.PI / 2 + (-bendState.pinky.pip * MAX_BEND_ANGLE);
+    fingers.pinky.p3.rotation.x = -Math.PI / 2 + (-bendState.pinky.dip * MAX_BEND_ANGLE);
 
     // Thumb (different axis due to orientation)
-    fingers.thumb.p1.rotation.y = -bendState.thumb.mcp * MAX_BEND_ANGLE * 0.5;
-    fingers.thumb.p2.rotation.y = -bendState.thumb.pip * MAX_BEND_ANGLE * 0.6;
-    fingers.thumb.p3.rotation.y = -bendState.thumb.dip * MAX_BEND_ANGLE * 0.5;
+    fingers.thumb.p1.rotation.y = -Math.PI / 2 + (-bendState.thumb.mcp * MAX_BEND_ANGLE * 0.5);
+    fingers.thumb.p2.rotation.y = -Math.PI / 2 + (-bendState.thumb.pip * MAX_BEND_ANGLE * 0.6);
+    fingers.thumb.p3.rotation.y = -Math.PI / 2 + (-bendState.thumb.dip * MAX_BEND_ANGLE * 0.5);
 
     // Wrist rotation with quaternion slerp for smooth 3D free rotation
     wristCurrentQuat.slerp(wristTargetQuat, 0.15);
