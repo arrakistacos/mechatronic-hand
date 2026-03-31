@@ -810,7 +810,9 @@
     matrix.makeBasis(correctedRight, forward, up);
 
     // Extract quaternion from matrix
-    return new THREE.Quaternion().setFromRotationMatrix(matrix);
+    const q = new THREE.Quaternion().setFromRotationMatrix(matrix);
+    const yaw180 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+    return q.multiply(yaw180);
   }
 
   function onHandResults(results) {
