@@ -348,6 +348,30 @@
   </div>
 </div>
 
+<div id="debugPanel" style="
+    position: fixed; top: 120px; right: 10px;
+    background: rgba(0,0,0,0.75);
+    color: #00ff88;
+    font-family: monospace;
+    font-size: 11px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #00ff8844;
+    z-index: 1000;
+    min-width: 180px;
+    line-height: 1.6;
+    pointer-events: none;
+">
+    <div style="color:#88ffff;margin-bottom:4px">DEBUG</div>
+    <div id="dbg-index">index: --</div>
+    <div id="dbg-middle">middle: --</div>
+    <div id="dbg-ring">ring: --</div>
+    <div id="dbg-pinky">pinky: --</div>
+    <div id="dbg-thumb">thumb: --</div>
+    <div id="dbg-wrist" style="margin-top:4px;color:#ffff88">wrist: --</div>
+    <div id="dbg-quat" style="color:#ff8888">quat: --</div>
+</div>
+
 <div id="camera-preview">
   <div id="camera-label">◈ CAMERA FEED</div>
   <div id="camera-frame">
@@ -743,6 +767,9 @@
   let handTargetPos = new THREE.Vector3(0, 0, 0);
   let handCurrentPos = new THREE.Vector3(0, 0, 0);
 
+  // Debug logging throttle state
+  let lastDebugLog = 0;
+
   // ─── MEDIAPIPE SETUP ─────────────────────────────────────────────────────────
   const videoEl = document.getElementById('camera-video');
   const landmarkCanvas = document.getElementById('landmark-canvas');
@@ -885,6 +912,53 @@
       const wx = (0.5 - lm[0].x) * 4;
       const wy = (0.5 - lm[0].y) * 3;
       handTargetPos.set(wx, wy, 0);
+
+      // ── Debug panel (every frame) ─────────────────────────────────────
+      const _R2D = 180 / Math.PI;
+      const _bScale = MAX_BEND_ANGLE * _R2D;
+      document.getElementById('dbg-index').textContent =
+        `index: ${(bendTarget.index.mcp * _bScale).toFixed(0)}° ${(bendTarget.index.pip * _bScale).toFixed(0)}° ${(bendTarget.index.dip * _bScale).toFixed(0)}°`;
+      document.getElementById('dbg-middle').textContent =
+        `middle: ${(bendTarget.middle.mcp * _bScale).toFixed(0)}° ${(bendTarget.middle.pip * _bScale).toFixed(0)}° ${(bendTarget.middle.dip * _bScale).toFixed(0)}°`;
+      document.getElementById('dbg-ring').textContent =
+        `ring: ${(bendTarget.ring.mcp * _bScale).toFixed(0)}° ${(bendTarget.ring.pip * _bScale).toFixed(0)}° ${(bendTarget.ring.dip * _bScale).toFixed(0)}°`;
+      document.getElementById('dbg-pinky').textContent =
+        `pinky: ${(bendTarget.pinky.mcp * _bScale).toFixed(0)}° ${(bendTarget.pinky.pip * _bScale).toFixed(0)}° ${(bendTarget.pinky.dip * _bScale).toFixed(0)}°`;
+      document.getElementById('dbg-thumb').textContent =
+        `thumb: ${(bendTarget.thumb.mcp * _bScale).toFixed(0)}° ${(bendTarget.thumb.pip * _bScale).toFixed(0)}° ${(bendTarget.thumb.dip * _bScale).toFixed(0)}°`;
+      document.getElementById('dbg-wrist').textContent =
+        `wrist x:${lm[0].x.toFixed(2)} y:${lm[0].y.toFixed(2)}`;
+      document.getElementById('dbg-quat').textContent =
+        `q: ${handRoot.quaternion.x.toFixed(2)} ${handRoot.quaternion.y.toFixed(2)} ${handRoot.quaternion.z.toFixed(2)}`;
+
+      // ── Throttled console log (once per second) ────────────────────────
+      const _now = Date.now();
+      if (_now - lastDebugLog > 1000) {
+        lastDebugLog = _now;
+        console.log('=== HAND DEBUG ===', {
+          wrist:     { x: lm[0].x.toFixed(3),  y: lm[0].y.toFixed(3),  z: lm[0].z.toFixed(3) },
+          indexTip:  { x: lm[8].x.toFixed(3),  y: lm[8].y.toFixed(3),  z: lm[8].z.toFixed(3) },
+          middleTip: { x: lm[12].x.toFixed(3), y: lm[12].y.toFixed(3), z: lm[12].z.toFixed(3) },
+          fingerBends: {
+            thumb:  [(bendTarget.thumb.mcp  * _bScale).toFixed(1), (bendTarget.thumb.pip  * _bScale).toFixed(1), (bendTarget.thumb.dip  * _bScale).toFixed(1)],
+            index:  [(bendTarget.index.mcp  * _bScale).toFixed(1), (bendTarget.index.pip  * _bScale).toFixed(1), (bendTarget.index.dip  * _bScale).toFixed(1)],
+            middle: [(bendTarget.middle.mcp * _bScale).toFixed(1), (bendTarget.middle.pip * _bScale).toFixed(1), (bendTarget.middle.dip * _bScale).toFixed(1)],
+            ring:   [(bendTarget.ring.mcp   * _bScale).toFixed(1), (bendTarget.ring.pip   * _bScale).toFixed(1), (bendTarget.ring.dip   * _bScale).toFixed(1)],
+            pinky:  [(bendTarget.pinky.mcp  * _bScale).toFixed(1), (bendTarget.pinky.pip  * _bScale).toFixed(1), (bendTarget.pinky.dip  * _bScale).toFixed(1)]
+          },
+          boneRotations: {
+            index_p1: fingers.index.p1.rotation.x.toFixed(3),
+            index_p2: fingers.index.p2.rotation.x.toFixed(3),
+            index_p3: fingers.index.p3.rotation.x.toFixed(3)
+          },
+          handQuat: {
+            x: handRoot.quaternion.x.toFixed(3),
+            y: handRoot.quaternion.y.toFixed(3),
+            z: handRoot.quaternion.z.toFixed(3),
+            w: handRoot.quaternion.w.toFixed(3)
+          }
+        });
+      }
 
     } else {
       setDot('tracking', '');
